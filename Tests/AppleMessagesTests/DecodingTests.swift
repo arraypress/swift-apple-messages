@@ -245,3 +245,14 @@ final class QueryTests: XCTestCase {
         XCTAssertEqual(values.count, 1)
     }
 }
+
+final class FilterTests: XCTestCase {
+
+    func testOnlyMine() {
+        let (sql, values) = MessageQueries.messages(MessageQuery(fromMe: true), handleIDs: nil)
+        XCTAssertTrue(sql.contains("m.is_from_me = ?"))
+        XCTAssertTrue(values.contains { if case .integer(1) = $0 { return true }; return false })
+        let (anyone, _) = MessageQueries.messages(MessageQuery(), handleIDs: nil)
+        XCTAssertFalse(anyone.contains("m.is_from_me = ?"))
+    }
+}

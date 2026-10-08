@@ -38,6 +38,7 @@ Not just the text column. Each of these is its own format, and each is read:
 | **Effects** | `lasers`, `heart`, `impact` — named as Apple names them, not from a table |
 | **iMessage apps** | the app a balloon came from: Find My, Apple Pay, games |
 | **Voice messages, threaded replies, subjects** | flagged on the message |
+| **Delivery and read** | delivered (with its time, when Messages recorded one — none is invented), read, and send errors |
 | **Group events** | people added or removed, renames — opt-in, since they are not things anybody said |
 | **Deleted conversations** | left out by default, as Messages leaves them out |
 

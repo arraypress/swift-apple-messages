@@ -37,8 +37,20 @@ public struct Message: Sendable, Equatable, Codable, Identifiable {
     /// When it was sent or received.
     public let date: Date
 
-    /// When it was read, for one that has been.
+    /// When it was read. For one you sent, when they read it — only if they
+    /// send read receipts; for one you received, when you did.
     public let readAt: Date?
+
+    /// Whether it reached their device, for one you sent.
+    public let isDelivered: Bool
+
+    /// When it reached their device, when Messages recorded the time. The
+    /// flag can be set with no date; no date is invented for it.
+    public let deliveredAt: Date?
+
+    /// Messages' error code for a send that failed; `nil` when there was
+    /// none.
+    public let sendError: Int?
 
     /// When it was last edited, for one that was.
     public let editedAt: Date?
@@ -99,6 +111,9 @@ public struct Message: Sendable, Equatable, Codable, Identifiable {
         text: String? = nil,
         date: Date,
         readAt: Date? = nil,
+        isDelivered: Bool = false,
+        deliveredAt: Date? = nil,
+        sendError: Int? = nil,
         editedAt: Date? = nil,
         service: Service = .iMessage,
         attachments: [Attachment] = [],
@@ -122,6 +137,9 @@ public struct Message: Sendable, Equatable, Codable, Identifiable {
         self.text = text
         self.date = date
         self.readAt = readAt
+        self.isDelivered = isDelivered
+        self.deliveredAt = deliveredAt
+        self.sendError = sendError
         self.editedAt = editedAt
         self.service = service
         self.attachments = attachments

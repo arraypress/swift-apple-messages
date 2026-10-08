@@ -47,7 +47,8 @@ enum MessageQueries {
         m.date, m.date_read, m.date_edited, m.service, m.thread_originator_guid,
         m.subject, m.message_summary_info, m.date_retracted, m.expressive_send_style_id,
         m.is_audio_message, m.balloon_bundle_id, m.payload_data,
-        m.item_type, m.group_action_type, m.group_title, oh.id
+        m.item_type, m.group_action_type, m.group_title, oh.id,
+        m.date_delivered, m.is_delivered, m.error
         """
 
     /// The joins every message query uses.
@@ -75,6 +76,10 @@ enum MessageQueries {
         if let chat = query.chatID {
             conditions.append("j.chat_id = ?")
             values.append(.integer(chat))
+        }
+        if let fromMe = query.fromMe {
+            conditions.append("m.is_from_me = ?")
+            values.append(.integer(fromMe ? 1 : 0))
         }
         if let since = query.since {
             conditions.append("m.date >= ?")

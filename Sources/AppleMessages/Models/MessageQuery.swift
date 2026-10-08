@@ -20,6 +20,10 @@ public struct MessageQuery: Sendable, Equatable {
     /// see ``AddressMatch``.
     public var from: String?
 
+    /// Only messages you sent (`true`), or only messages others sent
+    /// (`false`). `nil` for both.
+    public var fromMe: Bool?
+
     /// Received on or after.
     public var since: Date?
 
@@ -51,6 +55,7 @@ public struct MessageQuery: Sendable, Equatable {
         chatID: Int64? = nil,
         text: String? = nil,
         from: String? = nil,
+        fromMe: Bool? = nil,
         since: Date? = nil,
         until: Date? = nil,
         afterID: Int64? = nil,
@@ -62,6 +67,7 @@ public struct MessageQuery: Sendable, Equatable {
         self.chatID = chatID
         self.text = text
         self.from = from
+        self.fromMe = fromMe
         self.since = since
         self.until = until
         self.afterID = afterID
