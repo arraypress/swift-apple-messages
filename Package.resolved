@@ -1,0 +1,15 @@
+{
+  "originHash" : "0956032ab873864b91c2da74b4590aa7f4e9837f1635a4e7c236df6272741c43",
+  "pins" : [
+    {
+      "identity" : "swift-contacts",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/arraypress/swift-contacts.git",
+      "state" : {
+        "revision" : "70386126db2a6a589f999687bea549200e5991ea",
+        "version" : "0.1.1"
+      }
+    }
+  ],
+  "version" : 3
+}
