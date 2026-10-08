@@ -53,9 +53,22 @@ public enum MessageSender {
     }
 
     /// Sends a file to an existing conversation.
-    public static func send(file: URL, toChat guid: String) throws {
+    ///
+    /// **The file is staged first.** Messages is sandboxed: handed a path in
+    /// Downloads or on the Desktop, its AppleScript `send` succeeded, the
+    /// message was even marked delivered — and it carried no attachment at
+    /// all, an empty bubble. Messages reads its own attachments folder, so a
+    /// copy goes there (see ``AttachmentStaging``) and that copy is sent. The
+    /// original is not touched.
+    ///
+    /// - Returns: The name the attachment will carry, for a caller checking
+    ///   that it really arrived.
+    @discardableResult
+    public static func send(file: URL, toChat guid: String) throws -> String {
         guard FileManager.default.fileExists(atPath: file.path) else { throw MessagesError.noSuchFile(file.path) }
-        try run(SendScripts.fileToChat, [file.path, guid])
+        let staged = try AttachmentStaging.stage(file)
+        try run(SendScripts.fileToChat, [staged.path, guid])
+        return staged.lastPathComponent
     }
 
     /// Runs a send script with its values as arguments.

@@ -104,6 +104,14 @@ a missing photo.
 
 **RCS is a third service**, stored alongside iMessage and SMS.
 
+**A file Messages cannot read goes out as an empty message.** Handed a path
+in Downloads, AppleScript's `send` succeeded and the message was marked
+delivered — with no attachment at all. Messages is sandboxed and reads its
+own `~/Library/Messages/Attachments` reliably, so `send(file:toChat:)` stages
+a copy there first (as steipete's imsg does) and returns the name the
+attachment will carry, so a caller can confirm it arrived. Staged copies are
+cleared after a day.
+
 **Group events say only some of what they were.** Type 1 names the person and
 whether they were added or removed; type 2 carries the new name. Types 3–5
 carry neither, so they are reported by code rather than guessed at.
@@ -112,8 +120,6 @@ carry neither, so they are reported by code rather than guessed at.
 
 - **Group chats.** Reading and naming them is built and unit-tested; sending to
   a group and group events have not been checked against a live group.
-- **Sending a file.** Built on Messages' documented `send <file> to chat`, not
-  yet run.
 
 ## Requirements
 
