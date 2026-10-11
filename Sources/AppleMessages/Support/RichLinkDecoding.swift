@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import LinkPresentation
 
 /// A link preview out of `payload_data`.
 ///
