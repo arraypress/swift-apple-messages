@@ -27,7 +27,7 @@ try MessageSender.send("On my way", toChat: chat.guid)      // sends
 
 Not just the text column. Each of these is its own format, and each is read:
 
-| | |
+| Part | How it is read |
 |---|---|
 | **Text** | the `text` column, or — when that is empty — the archived `attributedBody`, read by Foundation's own typedstream reader |
 | **Reactions** | tapbacks settled onto the message they react to, a reaction taken back removed, emoji reactions with their emoji |
