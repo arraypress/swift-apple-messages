@@ -41,15 +41,17 @@ public enum MessageSender {
     /// The guid is the database's own (`any;-;+447700900123`), passed
     /// verbatim — so the reply goes to the same conversation, over the same
     /// service, that the person is already using.
-    public static func send(_ text: String, toChat guid: String) throws {
+    ///
+    /// - Parameter runner: What runs the script — see ``AppleScriptRunner``.
+    public static func send(_ text: String, toChat guid: String, runner: AppleScriptRunner) throws {
         guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { throw MessagesError.emptyMessage }
-        try run(SendScripts.toChat, [text, guid])
+        _ = try runner(SendScripts.toChat, [text, guid])
     }
 
     /// Sends text to an address with no conversation yet, over iMessage.
-    public static func send(_ text: String, toAddress address: String) throws {
+    public static func send(_ text: String, toAddress address: String, runner: AppleScriptRunner) throws {
         guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { throw MessagesError.emptyMessage }
-        try run(SendScripts.toAddress, [text, address])
+        _ = try runner(SendScripts.toAddress, [text, address])
     }
 
     /// Sends a file to an existing conversation.
@@ -64,30 +66,28 @@ public enum MessageSender {
     /// - Returns: The name the attachment will carry, for a caller checking
     ///   that it really arrived.
     @discardableResult
-    public static func send(file: URL, toChat guid: String) throws -> String {
+    public static func send(file: URL, toChat guid: String, runner: AppleScriptRunner) throws -> String {
         guard FileManager.default.fileExists(atPath: file.path) else { throw MessagesError.noSuchFile(file.path) }
         let staged = try AttachmentStaging.stage(file)
-        try run(SendScripts.fileToChat, [staged.path, guid])
+        _ = try runner(SendScripts.fileToChat, [staged.path, guid])
         return staged.lastPathComponent
     }
-
-    /// Runs a send script with its values as arguments.
-    ///
-    /// Values go in as `argv`, never pasted into the script's source: a
-    /// message containing `"` or `\` or `end tell` is text to send, and an
-    /// escaping mistake would make it code.
-    private static func run(_ script: String, _ arguments: [String]) throws {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
-        process.arguments = ["-e", script] + arguments
-        let error = Pipe()
-        process.standardError = error
-        process.standardOutput = FileHandle.nullDevice
-        do { try process.run() } catch { throw MessagesError.sendFailed(error.localizedDescription) }
-        process.waitUntilExit()
-        guard process.terminationStatus == 0 else {
-            let message = String(decoding: error.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
-            throw MessagesError.sendFailed(message.trimmingCharacters(in: .whitespacesAndNewlines))
-        }
-    }
 }
+
+/// Runs an AppleScript, its values as `argv`, and returns what it printed.
+///
+/// Injected rather than built in (0.2): running osascript well — a hard
+/// timeout that kills a script stuck on a dialog, both pipes read together,
+/// a `--` so a message starting `-e` stays a message, and an answer to
+/// "did it send before it failed?" — is the caller's runner's job, and the
+/// fleet's lives in CLIKit as `OSAScript.run`:
+///
+/// ```swift
+/// try MessageSender.send(text, toChat: guid) { try OSAScript.run($0, arguments: $1) }
+/// ```
+///
+/// Values go in as `arguments`, never pasted into the script's source: a
+/// message containing `"` or `\` or `end tell` is text to send, and an
+/// escaping mistake would make it code. Whatever the runner throws reaches
+/// the caller unchanged.
+public typealias AppleScriptRunner = @Sendable (_ source: String, _ arguments: [String]) throws -> String

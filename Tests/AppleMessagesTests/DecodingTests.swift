@@ -221,8 +221,42 @@ final class SendingTests: XCTestCase {
     }
 
     func testEmptyMessagesAreRefusedBeforeMessagesIsAsked() {
-        XCTAssertThrowsError(try MessageSender.send("  \n", toChat: "any;-;x")) {
+        let calls = Calls()
+        XCTAssertThrowsError(try MessageSender.send("  \n", toChat: "any;-;x", runner: calls.runner)) {
             XCTAssertEqual($0 as? MessagesError, .emptyMessage)
+        }
+        XCTAssertThrowsError(try MessageSender.send("", toAddress: "+447700900123", runner: calls.runner))
+        XCTAssertTrue(calls.recorded.isEmpty, "the runner was never reached")
+    }
+
+    func testTheRunnerGetsTheScriptAndTheValuesAsArguments() throws {
+        let calls = Calls()
+        try MessageSender.send("-e \"end tell", toChat: "any;-;+447700900123", runner: calls.runner)
+        try MessageSender.send("hi", toAddress: "ada@example.com", runner: calls.runner)
+        XCTAssertEqual(calls.recorded.map(\.source), [SendScripts.toChat, SendScripts.toAddress])
+        XCTAssertEqual(calls.recorded.map(\.arguments),
+                       [["-e \"end tell", "any;-;+447700900123"], ["hi", "ada@example.com"]])
+    }
+
+    func testWhatTheRunnerThrowsReachesTheCaller() {
+        struct Stuck: Error, Equatable {}
+        XCTAssertThrowsError(try MessageSender.send("hi", toChat: "any;-;x") { _, _ in throw Stuck() }) {
+            XCTAssertEqual($0 as? Stuck, Stuck(), "a timeout keeps its own type — and its retry verdict")
+        }
+    }
+}
+
+/// A runner that records what it was asked to run.
+private final class Calls: @unchecked Sendable {
+    private let lock = NSLock()
+    private var calls: [(source: String, arguments: [String])] = []
+
+    var recorded: [(source: String, arguments: [String])] { lock.withLock { calls } }
+
+    var runner: AppleScriptRunner {
+        { [self] source, arguments in
+            lock.withLock { calls.append((source, arguments)) }
+            return ""
         }
     }
 }

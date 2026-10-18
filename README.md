@@ -20,7 +20,8 @@ for message in try store.messages(MessageQuery(chatID: chat.id, limit: 20)) {
 }
 
 try MessageSender.draft("On my way", to: "+447700900123")   // opens a draft, sends nothing
-try MessageSender.send("On my way", toChat: chat.guid)      // sends
+try MessageSender.send("On my way", toChat: chat.guid,     // sends, through your
+                       runner: { try OSAScript.run($0, arguments: $1) })  // AppleScript runner
 ```
 
 ## What it decodes
@@ -70,6 +71,21 @@ conversation's own id — so a reply goes to the same thread, over the same
 service, the person already uses. The text and the id reach the script as
 `argv`, never pasted into its source, so nothing a message says can become
 AppleScript.
+
+**The script runner is yours (0.2).** `send` takes an `AppleScriptRunner` —
+`(source, arguments) throws -> String` — rather than starting osascript
+itself. Running it well is not this library's job: a hard timeout that kills a
+script stuck behind a dialog, both pipes read together, a `--` before the
+values (without it osascript reads a message that begins `-e` or `-s` as its
+own flag), and an answer to "did it send before it failed?". CLIKit's
+`OSAScript.run` does all four; whatever the runner throws reaches you
+unchanged.
+
+**Messages saying it sent is not the message existing.** macOS 26's Messages
+can report a successful send while writing an empty row attached to no
+conversation (found by OpenClaw's imsg). Confirm a send by finding YOUR new row
+in the TARGET conversation with the text you sent — the `imessage` CLI does
+exactly that, and calls anything less unconfirmed.
 
 Sending needs Automation permission for Messages, which macOS asks for once.
 
@@ -130,7 +146,7 @@ permission for Messages to send. Contacts permission, only for names.
 ## Installation
 
 ```swift
-.package(url: "https://github.com/arraypress/swift-apple-messages.git", from: "0.1.0")
+.package(url: "https://github.com/arraypress/swift-apple-messages.git", from: "0.2.0")
 ```
 
 ## Licence
