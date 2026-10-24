@@ -38,6 +38,9 @@ Not just the text column. Each of these is its own format, and each is read:
 | **Attachments** | name, type, size, path, whether it is still on this Mac, stickers — and how many a message HAD whose records are gone |
 | **Effects** | `lasers`, `heart`, `impact` — named as Apple names them, not from a table |
 | **iMessage apps** | the app a balloon came from: Find My, Apple Pay, games |
+| **App cards** | an iMessage app's card — its name, captions and web link — from the keyed archive in `payload_data` (plain Foundation classes, so read with secure coding) |
+| **Shared places** | a Find My share unpacked (its URL's `FindMyMessagePayloadZippedDataKey` is base64 of raw-deflated JSON: coordinates, accuracy, fix time, how long it is shared for), and coordinates in Google or Apple Maps cards and links. A snapshot: where they were when they sent it |
+| **Text styles and animations** | bold, italic, underline, strikethrough and the eight text animations, as `runs` (and `runs.markdown`), from the attributes in `attributedBody` |
 | **Voice messages, threaded replies, subjects** | flagged on the message |
 | **Delivery and read** | delivered (with its time, when Messages recorded one — none is invented), read, and send errors |
 | **Group events** | people added or removed, renames — opt-in, since they are not things anybody said |
@@ -131,6 +134,25 @@ cleared after a day.
 **Group events say only some of what they were.** Type 1 names the person and
 whether they were added or removed; type 2 carries the new name. Types 3–5
 carry neither, so they are reported by code rather than guessed at.
+
+**Styles and animations are attributes, measured one by one** (macOS 27,
+2026-10-25). Each style is its own attribute set to 1 —
+`__kIMTextBoldAttributeName`, `…Italic…`, `…Underline…`,
+`…Strikethrough…`. Every text animation is ONE attribute,
+`__kIMTextEffectAttributeName`, holding a number: Ripple 4, Big 5, Bloom 6,
+Nod 8, Shake 9, Jitter 10, Small 11, Explode 12. A number never measured
+comes back as `effect-N`, not a guess. Reading them is all this does:
+sending them needs Messages' private API, which needs System Integrity
+Protection off.
+
+**A Find My card's text is not `�`.** Its whole text is a lone U+FFFD with
+a "breadcrumb" attribute, the way a photo's is U+FFFC. Both are marks, not
+words, and both are dropped.
+
+**Find My's base64 has `+` in it.** Read its query by splitting on `&` and
+`=` and percent-decoding — a form decoder turns each `+` into a space and
+the data no longer inflates. The location's own `timestamp` is Unix time;
+the payload's is seconds since 2001.
 
 ## Not verified
 

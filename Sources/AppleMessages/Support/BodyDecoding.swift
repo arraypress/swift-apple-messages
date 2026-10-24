@@ -28,6 +28,11 @@ enum BodyDecoding {
     /// The object-replacement character marking where an attachment sits.
     static let attachmentMark: Character = "\u{FFFC}"
 
+    /// What an iMessage app's card (Find My, measured) carries as its whole
+    /// text: a replacement character with a "breadcrumb" attribute — not
+    /// words, so never shown as `�`.
+    static let appMark: Character = "\u{FFFD}"
+
     /// The text to show: the `text` column when it has any, else the
     /// decoded body, with attachment marks removed. `nil` when nothing is
     /// left — a message that is only a photo.
@@ -55,7 +60,12 @@ enum BodyDecoding {
 
     /// Text without attachment marks, or `nil` when that leaves nothing.
     static func clean(_ text: String) -> String? {
-        let cleaned = text.filter { $0 != attachmentMark }
+        let cleaned = strip(text)
         return cleaned.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : cleaned
+    }
+
+    /// Text without attachment or app marks.
+    static func strip(_ text: String) -> String {
+        text.filter { $0 != attachmentMark && $0 != appMark }
     }
 }

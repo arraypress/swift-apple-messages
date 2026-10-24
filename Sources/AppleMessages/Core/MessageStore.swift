@@ -155,6 +155,14 @@ public final class MessageStore {
             event: MessageKinds.event(itemType: row.integer(19), action: row.integer(20),
                                       title: row.text(21), other: row.text(22))
         )
+        message.runs = TextRuns.runs(row.data(6))
+        if message.app != nil, let decoded = CardDecoding.card(row.data(18)) {
+            message.card = decoded.card
+            message.location = CardDecoding.location(cardURL: decoded.url, card: decoded.card)
+        }
+        if message.location == nil, let url = link?.url, let place = CardDecoding.coordinates(url) {
+            message.location = SharedLocation(latitude: place.latitude, longitude: place.longitude, source: place.source)
+        }
         // Held here until the attachments are read; ``decorate(_:)`` turns it
         // into how many are missing.
         message.missingAttachments = BodyDecoding.placeholders(column: row.text(5), body: row.data(6))

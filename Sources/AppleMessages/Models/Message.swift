@@ -101,6 +101,17 @@ public struct Message: Sendable, Equatable, Codable, Identifiable {
     /// What happened, for a row that is a conversation event, not a message.
     public var event: ChatEvent?
 
+    /// The text in styled stretches, when any of it is bold, italic,
+    /// underlined, struck through or animated; `nil` for plain text (most).
+    public var runs: [TextRun]?
+
+    /// The card an iMessage app sent — its captions and link.
+    public var card: AppCard?
+
+    /// A place it carries: a Find My share, a maps card or a maps link.
+    /// Where they were when they sent it, not where they are now.
+    public var location: SharedLocation?
+
     /// A message from its parts.
     public init(
         id: Int64,
