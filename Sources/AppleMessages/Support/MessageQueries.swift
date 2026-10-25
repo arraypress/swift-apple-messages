@@ -118,6 +118,21 @@ enum MessageQueries {
     /// One message by row.
     static let message = "select \(messageColumns) \(messageJoins) where m.ROWID = ?"
 
+    /// One message by guid — what a reaction names its target by.
+    static let messageByGUID = "select \(messageColumns) \(messageJoins) where m.guid = ?"
+
+    /// Reaction rows newer than a row, oldest first: added and taken back.
+    static let reactionEvents = """
+        select r.ROWID, r.guid, cmj.chat_id, r.associated_message_type, r.associated_message_emoji,
+               r.is_from_me, h.id, r.associated_message_guid, r.date, r.service
+        from message r
+        left join handle h on h.ROWID = r.handle_id
+        left join chat_message_join cmj on cmj.message_id = r.ROWID
+        where r.associated_message_type between 2000 and 3999 and r.ROWID > ?
+        order by r.ROWID
+        limit ?
+        """
+
     /// Reaction rows pointing at any of a set of guids. One `?` per guid.
     static func reactions(count: Int) -> String {
         """

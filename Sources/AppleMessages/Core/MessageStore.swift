@@ -99,6 +99,43 @@ public final class MessageStore {
         return try decorate([found])[0]
     }
 
+    /// One message by guid — as a reaction names the message it is on.
+    /// `nil` when no row has it: a reaction can outlive its message.
+    public func message(guid: String) throws -> Message? {
+        var found: Message?
+        try database.query(MessageQueries.messageByGUID, [.text(guid)]) { row in found = Self.message(from: row) }
+        guard let found else { return nil }
+        return try decorate([found])[0]
+    }
+
+    /// Tapbacks newer than a row, oldest first — each add and each take-back
+    /// as it happened, for following reactions as they arrive.
+    ///
+    /// Message queries leave these rows out, since a reaction is not a
+    /// message; this is the one way to see them come in.
+    public func reactionEvents(afterID: Int64, limit: Int = 200) throws -> [ReactionEvent] {
+        var events: [ReactionEvent] = []
+        try database.query(MessageQueries.reactionEvents, [.integer(afterID), .integer(Int64(limit))]) { row in
+            guard let guid = row.text(1), let associated = row.text(7),
+                  let (kind, removes) = ReactionCodes.kind(Int(row.integer(3))) else { return }
+            let isFromMe = row.integer(5) == 1
+            events.append(ReactionEvent(
+                id: row.integer(0),
+                guid: guid,
+                chatID: row.integer(2) == 0 ? nil : row.integer(2),
+                kind: kind,
+                emoji: row.text(4),
+                removes: removes,
+                from: isFromMe ? nil : row.text(6).map { Handle(address: $0) },
+                isFromMe: isFromMe,
+                targetGUID: ReactionCodes.target(associated),
+                date: StoredDate.date(row.integer(8)) ?? Date(timeIntervalSinceReferenceDate: 0),
+                service: Service(stored: row.text(9))
+            ))
+        }
+        return events
+    }
+
     /// The newest message row, for watching from.
     public func latestID() throws -> Int64 {
         var latest: Int64 = 0
