@@ -31,7 +31,7 @@ Not just the text column. Each of these is its own format, and each is read:
 | Part | How it is read |
 |---|---|
 | **Text** | the `text` column, or — when that is empty — the archived `attributedBody`, read by Foundation's own typedstream reader |
-| **Reactions** | tapbacks settled onto the message they react to, a reaction taken back removed, emoji reactions with their emoji |
+| **Reactions** | tapbacks settled onto the message they react to, a reaction taken back removed, emoji reactions with their emoji — and, for a reader following new rows, `reactionEvents(afterID:)`: each one as it happened, added or taken back, with `message(guid:)` to find what it is on |
 | **Edits** | every earlier version, from `message_summary_info` — not from `date_edited`, which is usually unset |
 | **Unsent** | from the summary's `rp` — `date_retracted` stays 0 |
 | **Link previews** | URL and title, from the `LPLinkMetadata` inside Messages' private `RichLink` archive |
@@ -153,6 +153,13 @@ words, and both are dropped.
 `=` and percent-decoding — a form decoder turns each `+` into a space and
 the data no longer inflates. The location's own `timestamp` is Unix time;
 the payload's is seconds since 2001.
+
+**In a conversation with yourself, a reaction can point at nothing here.**
+Every message to yourself is stored twice on the Mac, sent and received, each
+with its own guid — and a tapback from the phone names the phone's own copy, a
+third guid that never reaches the Mac (measured 2026-10-25). The reaction's
+row still carries Apple's summary in its `text` — `Laughed at “…”` — quoting
+the words; that is what to show when `message(guid:)` finds nothing.
 
 ## Not verified
 
