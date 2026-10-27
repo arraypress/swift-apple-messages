@@ -8,6 +8,7 @@
 //
 
 import Foundation
+import SQLiteReader
 
 /// Everything Messages has stored, read-only.
 ///
@@ -19,14 +20,15 @@ import Foundation
 /// let recent = try store.messages(MessageQuery(chatID: 42, limit: 20))
 /// ```
 ///
-/// Opens `~/Library/Messages/chat.db` read-only, with no copy. There is no
+/// Opens `~/Library/Messages/chat.db` read-only, with no copy, through
+/// swift-sqlite-reader. There is no
 /// code path here that writes to it, and there should never be one: the
 /// schema is Apple's, undocumented, and the database is being written by
 /// Messages and synced through iCloud while this reads. Sending goes through
 /// Messages itself — see ``MessageSender``.
 public final class MessageStore {
 
-    private let database: SQLiteDatabase
+    private let database: SQLiteReader
 
     /// Where the database lives.
     public let path: String
@@ -36,7 +38,23 @@ public final class MessageStore {
         let resolved = path ?? FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent("Library/Messages/chat.db").path
         self.path = resolved
-        self.database = try SQLiteDatabase(path: resolved)
+        // `.readOnly` on the live file, with no copy, and NOT `immutable=1`,
+        // which one published iMessage server uses: SQLite's documentation
+        // says that flag turns off locking and change detection — it promises
+        // the file never changes, and Messages is writing to it. Read once,
+        // both modes return the same rows; the difference is over time, which
+        // is exactly where `watch` lives.
+        do {
+            self.database = try SQLiteReader(path: URL(fileURLWithPath: resolved), opening: .readOnly)
+        } catch {
+            throw MessagesError(error)
+        }
+    }
+
+    /// Runs a query, handing each row to `row`; values belong in
+    /// `parameters`, bound in order, never pasted into the SQL.
+    private func run(_ sql: String, _ parameters: [SQLiteValue] = [], row: (SQLiteRow) -> Void) throws {
+        do { try database.query(sql, parameters, row: row) } catch { throw MessagesError(error) }
     }
 
     // MARK: - Conversations
@@ -44,12 +62,12 @@ public final class MessageStore {
     /// Every conversation, most recent first, with its participants.
     public func chats() throws -> [Chat] {
         var participants: [Int64: [Handle]] = [:]
-        try database.query(MessageQueries.participants) { row in
+        try run(MessageQueries.participants) { row in
             if let address = row.text(1) { participants[row.integer(0), default: []].append(Handle(address: address)) }
         }
 
         var chats: [Chat] = []
-        try database.query(MessageQueries.chats) { row in
+        try run(MessageQueries.chats) { row in
             let id = row.integer(0)
             chats.append(Chat(
                 id: id,
@@ -80,7 +98,7 @@ public final class MessageStore {
         let (sql, values) = MessageQueries.messages(query, handleIDs: handleIDs)
         var found: [Message] = []
         let wanted = query.text.flatMap { $0.isEmpty ? nil : $0 }
-        try database.query(sql, values) { row in
+        try run(sql, values) { row in
             guard wanted == nil || found.count < query.limit else { return }
             let message = Self.message(from: row)
             // Text only in attributedBody could not be matched in SQL; it is
@@ -94,7 +112,7 @@ public final class MessageStore {
     /// One message by row.
     public func message(id: Int64) throws -> Message {
         var found: Message?
-        try database.query(MessageQueries.message, [.integer(id)]) { row in found = Self.message(from: row) }
+        try run(MessageQueries.message, [.integer(id)]) { row in found = Self.message(from: row) }
         guard let found else { throw MessagesError.noSuchMessage(id) }
         return try decorate([found])[0]
     }
@@ -103,7 +121,7 @@ public final class MessageStore {
     /// `nil` when no row has it: a reaction can outlive its message.
     public func message(guid: String) throws -> Message? {
         var found: Message?
-        try database.query(MessageQueries.messageByGUID, [.text(guid)]) { row in found = Self.message(from: row) }
+        try run(MessageQueries.messageByGUID, [.text(guid)]) { row in found = Self.message(from: row) }
         guard let found else { return nil }
         return try decorate([found])[0]
     }
@@ -115,7 +133,7 @@ public final class MessageStore {
     /// message; this is the one way to see them come in.
     public func reactionEvents(afterID: Int64, limit: Int = 200) throws -> [ReactionEvent] {
         var events: [ReactionEvent] = []
-        try database.query(MessageQueries.reactionEvents, [.integer(afterID), .integer(Int64(limit))]) { row in
+        try run(MessageQueries.reactionEvents, [.integer(afterID), .integer(Int64(limit))]) { row in
             guard let guid = row.text(1), let associated = row.text(7),
                   let (kind, removes) = ReactionCodes.kind(Int(row.integer(3))) else { return }
             let isFromMe = row.integer(5) == 1
@@ -139,14 +157,14 @@ public final class MessageStore {
     /// The newest message row, for watching from.
     public func latestID() throws -> Int64 {
         var latest: Int64 = 0
-        try database.query(MessageQueries.latestID) { row in latest = row.integer(0) }
+        try run(MessageQueries.latestID) { row in latest = row.integer(0) }
         return latest
     }
 
     /// Every handle, by row.
     func handles() throws -> [(id: Int64, address: String)] {
         var handles: [(Int64, String)] = []
-        try database.query(MessageQueries.handles) { row in
+        try run(MessageQueries.handles) { row in
             if let address = row.text(1) { handles.append((row.integer(0), address)) }
         }
         return handles
@@ -155,7 +173,7 @@ public final class MessageStore {
     // MARK: - Assembly
 
     /// A message from a row of ``MessageQueries/messageColumns``.
-    static func message(from row: SQLiteDatabase.Row) -> Message {
+    static func message(from row: SQLiteRow) -> Message {
         let isFromMe = row.integer(4) == 1
         let chat = row.integer(2)
         let text = BodyDecoding.text(column: row.text(5), body: row.data(6))
@@ -217,7 +235,7 @@ public final class MessageStore {
         var events: [String: [ReactionCodes.Event]] = [:]
 
         for chunk in stride(from: 0, to: messages.count, by: 500).map({ Array(messages[$0..<min($0 + 500, messages.count)]) }) {
-            try database.query(MessageQueries.attachments(count: chunk.count), chunk.map { .integer($0.id) }) { row in
+            try run(MessageQueries.attachments(count: chunk.count), chunk.map { .integer($0.id) }) { row in
                 let path = row.text(2).map { ($0 as NSString).expandingTildeInPath }
                 // The data behind a link card is not a file anybody sent — but
                 // it holds a placeholder in the text, so it is counted, or the
@@ -235,7 +253,7 @@ public final class MessageStore {
                     isSticker: row.integer(5) == 1
                 ))
             }
-            try database.query(MessageQueries.reactions(count: chunk.count), chunk.map { .text($0.guid) }) { row in
+            try run(MessageQueries.reactions(count: chunk.count), chunk.map { .text($0.guid) }) { row in
                 guard let associated = row.text(0) else { return }
                 let target = ReactionCodes.target(associated)
                 events[target, default: []].append(ReactionCodes.Event(

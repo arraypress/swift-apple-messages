@@ -17,13 +17,21 @@ let package = Package(
         // and "07700 900123" are the same number lives there, measured, and
         // is not written twice.
         .package(url: "https://github.com/arraypress/swift-contacts.git", from: "0.1.1"),
+        // Opening chat.db read-only and running queries over it.
+        .package(url: "https://github.com/arraypress/swift-sqlite-reader.git", from: "0.1.0"),
     ],
     targets: [
         .target(
             name: "AppleMessages",
-            dependencies: [.product(name: "ContactsKit", package: "swift-contacts")]
+            dependencies: [
+                .product(name: "ContactsKit", package: "swift-contacts"),
+                .product(name: "SQLiteReader", package: "swift-sqlite-reader"),
+            ]
         ),
-        .testTarget(name: "AppleMessagesTests", dependencies: ["AppleMessages"]),
+        .testTarget(name: "AppleMessagesTests", dependencies: [
+            "AppleMessages",
+            .product(name: "SQLiteReader", package: "swift-sqlite-reader"),
+        ]),
     ]
 )
 

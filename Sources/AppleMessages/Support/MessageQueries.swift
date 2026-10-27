@@ -8,6 +8,7 @@
 //
 
 import Foundation
+import SQLiteReader
 
 /// Queries against `chat.db`.
 ///

@@ -54,7 +54,9 @@ written — `07700 900123` is `+447700900123`.
 ## Read-only, and structurally so
 
 `MessageStore` opens `~/Library/Messages/chat.db` with `SQLITE_OPEN_READONLY`
-and no copy. Nothing in this library writes to it, and nothing should: the
+and no copy, through
+[swift-sqlite-reader](https://github.com/arraypress/swift-sqlite-reader)'s
+`.readOnly`. Nothing in this library writes to it, and nothing should: the
 schema is Apple's, undocumented, and the file is being written by Messages and
 synced through iCloud while this reads.
 

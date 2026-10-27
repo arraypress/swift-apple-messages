@@ -9,6 +9,7 @@
 //  the rules that decide whether a conversation comes out readable.
 //
 
+import SQLiteReader
 import XCTest
 @testable import AppleMessages
 

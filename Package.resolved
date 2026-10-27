@@ -1,5 +1,5 @@
 {
-  "originHash" : "0956032ab873864b91c2da74b4590aa7f4e9837f1635a4e7c236df6272741c43",
+  "originHash" : "505899881678997b37ce9f5f6df89db9a0ee5af60e5ce54a0bca38ce24374e62",
   "pins" : [
     {
       "identity" : "swift-contacts",
@@ -8,6 +8,15 @@
       "state" : {
         "revision" : "70386126db2a6a589f999687bea549200e5991ea",
         "version" : "0.1.1"
+      }
+    },
+    {
+      "identity" : "swift-sqlite-reader",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/arraypress/swift-sqlite-reader.git",
+      "state" : {
+        "revision" : "ecccbec440c5de3ae1f1e33c509665451607fe89",
+        "version" : "0.1.0"
       }
     }
   ],
