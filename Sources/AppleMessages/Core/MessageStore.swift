@@ -63,7 +63,7 @@ public final class MessageStore {
     public func chats() throws -> [Chat] {
         var participants: [Int64: [Handle]] = [:]
         try run(MessageQueries.participants) { row in
-            if let address = row.text(1) { participants[row.integer(0), default: []].append(Handle(address: address)) }
+            if let address = row[1].decodedString { participants[row.integer(0), default: []].append(Handle(address: address)) }
         }
 
         var chats: [Chat] = []
@@ -71,13 +71,13 @@ public final class MessageStore {
             let id = row.integer(0)
             chats.append(Chat(
                 id: id,
-                guid: row.text(1) ?? "",
-                displayName: row.text(2).flatMap { $0.isEmpty ? nil : $0 },
+                guid: row[1].decodedString ?? "",
+                displayName: row[2].nonEmptyString,
                 participants: participants[id] ?? [],
                 // 43 is a group and 45 one person: every 45 checked had
                 // exactly one participant, whose address is its identifier.
                 isGroup: row.integer(3) == 43,
-                service: Service(stored: row.text(4)),
+                service: Service(stored: row[4].decodedString),
                 lastMessageAt: StoredDate.date(row.integer(5)),
                 messageCount: Int(row.integer(6))
             ))
@@ -134,7 +134,7 @@ public final class MessageStore {
     public func reactionEvents(afterID: Int64, limit: Int = 200) throws -> [ReactionEvent] {
         var events: [ReactionEvent] = []
         try run(MessageQueries.reactionEvents, [.integer(afterID), .integer(Int64(limit))]) { row in
-            guard let guid = row.text(1), let associated = row.text(7),
+            guard let guid = row[1].decodedString, let associated = row[7].decodedString,
                   let (kind, removes) = ReactionCodes.kind(Int(row.integer(3))) else { return }
             let isFromMe = row.integer(5) == 1
             events.append(ReactionEvent(
@@ -142,13 +142,13 @@ public final class MessageStore {
                 guid: guid,
                 chatID: row.integer(2) == 0 ? nil : row.integer(2),
                 kind: kind,
-                emoji: row.text(4),
+                emoji: row[4].decodedString,
                 removes: removes,
-                from: isFromMe ? nil : row.text(6).map { Handle(address: $0) },
+                from: isFromMe ? nil : row[6].decodedString.map { Handle(address: $0) },
                 isFromMe: isFromMe,
                 targetGUID: ReactionCodes.target(associated),
                 date: StoredDate.date(row.integer(8)) ?? Date(timeIntervalSinceReferenceDate: 0),
-                service: Service(stored: row.text(9))
+                service: Service(stored: row[9].decodedString)
             ))
         }
         return events
@@ -165,7 +165,7 @@ public final class MessageStore {
     func handles() throws -> [(id: Int64, address: String)] {
         var handles: [(Int64, String)] = []
         try run(MessageQueries.handles) { row in
-            if let address = row.text(1) { handles.append((row.integer(0), address)) }
+            if let address = row[1].decodedString { handles.append((row.integer(0), address)) }
         }
         return handles
     }
@@ -176,20 +176,20 @@ public final class MessageStore {
     static func message(from row: SQLiteRow) -> Message {
         let isFromMe = row.integer(4) == 1
         let chat = row.integer(2)
-        let text = BodyDecoding.text(column: row.text(5), body: row.data(6))
-        let summary = SummaryInfo.dictionary(row.data(13))
-        let balloon = row.text(17)
+        let text = BodyDecoding.text(column: row[5].decodedString, body: row[6].nonEmptyData)
+        let summary = SummaryInfo.dictionary(row[13].nonEmptyData)
+        let balloon = row[17].decodedString
 
         var link: LinkPreview?
         if balloon == MessageKinds.linkBalloon {
-            link = RichLinkDecoding.preview(row.data(18)) ?? RichLinkDecoding.firstLink(in: text)
+            link = RichLinkDecoding.preview(row[18].nonEmptyData) ?? RichLinkDecoding.firstLink(in: text)
         }
 
         var message = Message(
             id: row.integer(0),
-            guid: row.text(1) ?? "",
+            guid: row[1].decodedString ?? "",
             chatID: chat == 0 ? nil : chat,
-            sender: isFromMe ? nil : row.text(3).map { Handle(address: $0) },
+            sender: isFromMe ? nil : row[3].decodedString.map { Handle(address: $0) },
             isFromMe: isFromMe,
             text: text,
             date: StoredDate.date(row.integer(7)) ?? Date(timeIntervalSinceReferenceDate: 0),
@@ -198,20 +198,20 @@ public final class MessageStore {
             deliveredAt: StoredDate.date(row.integer(23)),
             sendError: row.integer(25) == 0 ? nil : Int(row.integer(25)),
             editedAt: StoredDate.date(row.integer(9)) ?? SummaryInfo.lastEdited(summary),
-            service: Service(stored: row.text(10)),
-            replyTo: row.text(11).flatMap { $0.isEmpty ? nil : $0 },
-            subject: row.text(12).flatMap { $0.isEmpty ? nil : $0 },
+            service: Service(stored: row[10].decodedString),
+            replyTo: row[11].nonEmptyString,
+            subject: row[12].nonEmptyString,
             edits: SummaryInfo.edits(summary, current: text),
             isUnsent: row.integer(14) > 0 || SummaryInfo.isUnsent(summary),
-            effect: MessageKinds.effect(row.text(15)),
+            effect: MessageKinds.effect(row[15].decodedString),
             isAudio: row.integer(16) == 1,
             link: link,
             app: MessageKinds.app(balloon),
             event: MessageKinds.event(itemType: row.integer(19), action: row.integer(20),
-                                      title: row.text(21), other: row.text(22))
+                                      title: row[21].decodedString, other: row[22].decodedString)
         )
-        message.runs = TextRuns.runs(row.data(6))
-        if message.app != nil, let decoded = CardDecoding.card(row.data(18)) {
+        message.runs = TextRuns.runs(row[6].nonEmptyData)
+        if message.app != nil, let decoded = CardDecoding.card(row[18].nonEmptyData) {
             message.card = decoded.card
             message.location = CardDecoding.location(cardURL: decoded.url, card: decoded.card)
         }
@@ -220,7 +220,7 @@ public final class MessageStore {
         }
         // Held here until the attachments are read; ``decorate(_:)`` turns it
         // into how many are missing.
-        message.missingAttachments = BodyDecoding.placeholders(column: row.text(5), body: row.data(6))
+        message.missingAttachments = BodyDecoding.placeholders(column: row[5].decodedString, body: row[6].nonEmptyData)
         return message
     }
 
@@ -236,7 +236,7 @@ public final class MessageStore {
 
         for chunk in stride(from: 0, to: messages.count, by: 500).map({ Array(messages[$0..<min($0 + 500, messages.count)]) }) {
             try run(MessageQueries.attachments(count: chunk.count), chunk.map { .integer($0.id) }) { row in
-                let path = row.text(2).map { ($0 as NSString).expandingTildeInPath }
+                let path = row[2].decodedString.map { ($0 as NSString).expandingTildeInPath }
                 // The data behind a link card is not a file anybody sent — but
                 // it holds a placeholder in the text, so it is counted, or the
                 // card would read as a missing attachment.
@@ -245,20 +245,20 @@ public final class MessageStore {
                     return
                 }
                 attachments[row.integer(0), default: []].append(Attachment(
-                    name: row.text(1),
+                    name: row[1].decodedString,
                     path: path,
-                    mimeType: row.text(3),
+                    mimeType: row[3].decodedString,
                     bytes: row.integer(4),
                     isLocal: path.map { FileManager.default.fileExists(atPath: $0) } ?? false,
                     isSticker: row.integer(5) == 1
                 ))
             }
             try run(MessageQueries.reactions(count: chunk.count), chunk.map { .text($0.guid) }) { row in
-                guard let associated = row.text(0) else { return }
+                guard let associated = row[0].decodedString else { return }
                 let target = ReactionCodes.target(associated)
                 events[target, default: []].append(ReactionCodes.Event(
-                    target: target, code: Int(row.integer(1)), emoji: row.text(2),
-                    sender: row.text(3), date: row.integer(4)
+                    target: target, code: Int(row.integer(1)), emoji: row[2].decodedString,
+                    sender: row[3].decodedString, date: row.integer(4)
                 ))
             }
         }
@@ -273,4 +273,10 @@ public final class MessageStore {
             return decorated
         }
     }
+}
+
+private extension SQLiteRow {
+
+    /// An integer column read as this store always has: 0 for NULL, a real truncated.
+    func integer(_ index: Int) -> Int64 { self[index].truncatedInt.map(Int64.init) ?? 0 }
 }
